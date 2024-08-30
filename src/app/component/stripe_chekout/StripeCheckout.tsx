@@ -1,28 +1,57 @@
-"use client";
-
-import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import MyCheckoutForm from "./MyCheckoutForm";
+import { useEffect, useState } from "react";
+import { Drawer } from "@mantine/core";
 
-// Correct the validation logic
-const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY;
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY);
 
-if (!stripePublishableKey) {
-  throw new Error("Stripe publishable key not found");
-}
+const CheckoutPage = ({ opened, closeDrawer, amount }: any) => {
+  const [clientSecret, setClientSecret] = useState("");
 
-const stripePromise = loadStripe(stripePublishableKey);
+  console.log("amount: ", amount);
 
-const amount = 1000;
+  useEffect(() => {
+    // Fetch the clientSecret
+    const fetchClientSecret = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:7000/create-payment-intent",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ amount }),
+          }
+        );
+        const data = await response.json();
+        setClientSecret(data.clientSecret);
+      } catch (error) {
+        console.error("Error fetching client secret:", error);
+      }
+    };
 
-const StripeCheckout = () => {
+    fetchClientSecret();
+  }, [amount]);
+
   return (
-    <div>
-      <Elements stripe={stripePromise}>
-        <MyCheckoutForm amount={amount} />
-      </Elements>
-    </div>
+    <Drawer
+      offset={8}
+      radius="md"
+      position="right"
+      opened={opened}
+      onClose={closeDrawer}
+      title="Stripe Payment"
+    >
+      {clientSecret && (
+        <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <MyCheckoutForm amount={amount} clientSecret={clientSecret} />
+        </Elements>
+      )}
+    </Drawer>
   );
 };
 
-export default StripeCheckout;
+export default CheckoutPage;
